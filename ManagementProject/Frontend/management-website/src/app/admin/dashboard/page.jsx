@@ -24,7 +24,7 @@ export default function AdminDashboard() {
       const { data: profile } = await supabase
         .from("Users")
         .select("role, email")
-        .eq("auth_id", user.id)
+        .eq("id", user.id)
         .single();
 
       if (!profile || profile.role !== "admin") {
@@ -34,7 +34,7 @@ export default function AdminDashboard() {
 
       // 3️⃣ fetch stats
       const { count: apartmentCount } = await supabase
-        .from("apartments")
+        .from("Apartments")
         .select("*", { count: "exact", head: true });
 
       const { count: userCount } = await supabase
@@ -42,7 +42,7 @@ export default function AdminDashboard() {
         .select("*", { count: "exact", head: true });
 
       const { data: apartments } = await supabase
-        .from("apartments")
+        .from("Apartments")
         .select("*")
         .order("apartment_id");
 

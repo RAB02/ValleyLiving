@@ -68,33 +68,53 @@ export function UserProvider({ children }) {
   useEffect(() => {
     // 1️⃣ Get initial session
     const getSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      const sessionUser = data.session?.user ?? null;
+    const { data } = await supabase.auth.getSession();
+    const sessionUser = data.session?.user ?? null;
 
-      setUser(sessionUser);
+    setUser(sessionUser);
 
-      if (sessionUser?.user_metadata?.role === "admin") {
-        setAdmin(true);
-      } else {
-        setAdmin(false);
-      }
+    if (sessionUser) {
+      const { data: roleData } = await supabase
+        .from("Users")
+        .select("role")
+        .eq("id", sessionUser.id)
+        .single();
 
-      setLoading(false);
-    };
+      setAdmin(roleData?.role === "admin");
+    } else {
+      setAdmin(false);
+    }
+
+    setLoading(false);
+  };
 
     getSession();
 
     // 2️⃣ Listen for login/logout/session expiry
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         const sessionUser = session?.user ?? null;
+
         setUser(sessionUser);
 
-        if (sessionUser?.user_metadata?.role === "admin") {
-          setAdmin(true);
-        } else {
+        if (!sessionUser) {
           setAdmin(false);
+          return;
         }
+
+        const { data: profile, error } = await supabase
+          .from("Users")
+          .select("role")
+          .eq("id", sessionUser.id)
+          .single();
+
+        if (error) {
+          console.error("Role lookup error:", error);
+          setAdmin(false);
+          return;
+        }
+
+        setAdmin(profile?.role === "admin");
       }
     );
 

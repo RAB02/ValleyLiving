@@ -21,21 +21,43 @@ export default function Navbar() {
       const sessionUser = data.session?.user || null;
 
       setUser(sessionUser);
-      setAdmin(sessionUser?.user_metadata?.role === "admin");
+
+      if (sessionUser) {
+        const { data: roleData } = await supabase
+          .from("Users")
+          .select("role")
+          .eq("id", sessionUser.id)
+          .single();
+
+        setAdmin(roleData?.role === "admin");
+      } else {
+        setAdmin(false);
+      }
     };
 
     getSession();
 
-    // 🔥 Listen for auth changes
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        const sessionUser = session?.user || null;
-        setUser(sessionUser);
-        setAdmin(sessionUser?.user_metadata?.role === "admin");
-      }
-    );
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const sessionUser = session?.user || null;
 
-    return () => listener.subscription.unsubscribe();
+      setUser(sessionUser);
+
+      if (sessionUser) {
+        const { data: roleData } = await supabase
+          .from("Users")
+          .select("role")
+          .eq("id", sessionUser.id)
+          .single();
+
+        setAdmin(roleData?.role === "admin");
+      } else {
+        setAdmin(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [setUser, setAdmin]);
 
   // ✅ Scroll shadow effect

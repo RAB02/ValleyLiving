@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AddLeaseForm from "@/components/leaseForm";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function AddLease() {
   const router = useRouter();
@@ -14,20 +15,58 @@ export default function AddLease() {
   // Fetch apartments + users for the form
   const fetchDashboardData = async () => {
     try {
-      const res = await fetch("http://localhost:8080/admin/dashboard", {
-        method: "GET",
-        credentials: "include",
-      });
+      // 1️⃣ Get logged in user
+      const { data: { user } } = await supabase.auth.getUser();
 
-      if (!res.ok) throw new Error("Unauthorized");
+      if (!user) {
+        router.push("/login");
+        return;
+      }
 
-      const json = await res.json();
-      setData(json);
-      console.log("Data:", data);
+      // 2️⃣ Get user profile (role check)
+      const { data: profile, error: profileError } = await supabase
+        .from("Users")
+        .select("role, email")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError || !profile) {
+        throw new Error("Failed to load profile");
+      }
+
+      if (profile.role !== "admin") {
+        router.push("/");
+        return;
+      }
+
+      // 3️⃣ Fetch stats
+      const [{ count: apartmentCount }, { count: userCount }, { data: apartments }] =
+        await Promise.all([
+          supabase.from("Apartments").select("*", { count: "exact", head: true }),
+          supabase.from("Users").select("*", { count: "exact", head: true }),
+          supabase.from("Apartments").select("*"),
+        ]);
+
+      const occupied = apartments?.filter(a => a.is_occupied).length || 0;
+      const vacant = apartments?.length - occupied || 0;
+
+      // 4️⃣ Set state (same as your old API response)
+      const dashboardData = {
+        apartmentCount: apartmentCount || 0,
+        userCount: userCount || 0,
+        apartments: apartments || [],
+        occupied,
+        vacant,
+        adminEmail: profile.email,
+      };
+
+      setData(dashboardData);
+
+      console.log("Data:", dashboardData); // ✅ fixed logging
     } catch (err) {
       console.error("Error loading dashboard:", err);
       setError("Session expired or unauthorized");
-      router.push("/admin/login");
+      router.push("/login");
     } finally {
       setLoading(false);
     }
