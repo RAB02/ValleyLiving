@@ -48,13 +48,10 @@ export default function AdminPaymentForm({
             >
               <option value="">Select lease</option>
               {leases
-                .filter(
-                  (l) =>
-                    !form.user_id || l.user_id === Number(form.user_id)
-                )
+                .filter((l) => !form.user_id || l.user_id === form.user_id)
                 .map((l) => (
                   <option key={l.lease_id} value={l.lease_id}>
-                    {l.address}
+                    {l.address} — ${l.rent_amount}
                   </option>
                 ))}
             </select>

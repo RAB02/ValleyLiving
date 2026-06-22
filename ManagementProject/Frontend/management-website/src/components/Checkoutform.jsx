@@ -71,28 +71,28 @@ export default function CheckoutForm({ form, onPaid }) {
       <div className="grid md:grid-cols-2 gap-x-10 gap-y-6">
         <div>
           <label className="text-sm font-medium text-gray-600">
-            Full Name
+            Full Name: 
           </label>
           <input value={form.name} readOnly className="input-box bg-gray-50" />
         </div>
 
         <div>
           <label className="text-sm font-medium text-gray-600">
-            Email
+            Email: 
           </label>
           <input value={form.email} readOnly className="input-box bg-gray-50" />
         </div>
 
         <div>
           <label className="text-sm font-medium text-gray-600">
-            Apartment
+            Apartment: 
           </label>
           <input value={form.address} readOnly className="input-box bg-gray-50" />
         </div>
 
         <div>
           <label className="text-sm font-medium text-gray-600">
-            Amount
+            Amount: 
           </label>
           <input value={form.amount} readOnly className="input-box bg-gray-50" />
         </div>

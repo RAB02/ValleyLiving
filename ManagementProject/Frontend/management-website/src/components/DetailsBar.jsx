@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Phone, Mail, Linkedin } from "react-feather";
+import { Phone, Mail, Linkedin, GitHub, Globe } from "react-feather";
 import Link from "next/link";
 
 export default function DetailsBar() {
@@ -27,7 +27,7 @@ export default function DetailsBar() {
           className="flex items-center space-x-2 text-white"
         >
           <Mail size={15} color="rgb(253, 252, 252)" />
-          <span>proj066@outlook.com</span>
+          <span>Bernalr2002@gmail.com</span>
         </Link>
       </div>
 
@@ -43,6 +43,21 @@ export default function DetailsBar() {
         >
           <Linkedin color="#fff" size={20} />
         </Link>
+
+        <Link
+          href="https://github.com/RAB02/Ramon"
+          className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-pink-500"
+        > 
+          <GitHub color="#fff" size={20} />
+        </Link>
+
+        <Link
+          href="https://portfolio-zmik.onrender.com/"
+          className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-pink-500"
+        >
+          <Globe color="#fff" size={20} />
+        </Link>
+
       </div>
     </div>
   );

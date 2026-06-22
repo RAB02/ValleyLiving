@@ -15,15 +15,17 @@ export default function AddLease() {
   // Fetch apartments + users for the form
   const fetchDashboardData = async () => {
     try {
-      // 1️⃣ Get logged in user
-      const { data: { user } } = await supabase.auth.getUser();
+      // Get logged in user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       if (!user) {
         router.push("/login");
         return;
       }
 
-      // 2️⃣ Get user profile (role check)
+      // Get profile
       const { data: profile, error: profileError } = await supabase
         .from("Users")
         .select("role, email")
@@ -39,30 +41,56 @@ export default function AddLease() {
         return;
       }
 
-      // 3️⃣ Fetch stats
-      const [{ count: apartmentCount }, { count: userCount }, { data: apartments }] =
-        await Promise.all([
-          supabase.from("Apartments").select("*", { count: "exact", head: true }),
-          supabase.from("Users").select("*", { count: "exact", head: true }),
-          supabase.from("Apartments").select("*"),
-        ]);
+      // Fetch apartments and users
+      const [
+        { count: apartmentCount },
+        { count: userCount },
+        { data: apartments, error: apartmentError },
+        { data: users, error: userError },
+      ] = await Promise.all([
+        supabase.from("Apartments").select("*", {
+          count: "exact",
+          head: true,
+        }),
 
-      const occupied = apartments?.filter(a => a.is_occupied).length || 0;
-      const vacant = apartments?.length - occupied || 0;
+        supabase.from("Users").select("*", {
+          count: "exact",
+          head: true,
+        }),
 
-      // 4️⃣ Set state (same as your old API response)
+        // Only vacant apartments
+        supabase
+          .from("Apartments")
+          .select("*")
+          .eq("is_occupied", 0),
+
+        // Only tenants (exclude admins)
+        supabase
+          .from("Users")
+          .select("id, email, role")
+          .eq("role", "user"),
+      ]);
+
+      if (apartmentError) throw apartmentError;
+      if (userError) throw userError;
+
+      const occupied = apartmentCount - apartments.length;
+      const vacant = apartments.length;
+
       const dashboardData = {
         apartmentCount: apartmentCount || 0,
         userCount: userCount || 0,
         apartments: apartments || [],
+        users: users || [],
         occupied,
         vacant,
         adminEmail: profile.email,
       };
 
-      setData(dashboardData);
+      console.log("Apartments:", apartments);
+      console.log("Users:", users);
 
-      console.log("Data:", dashboardData); // ✅ fixed logging
+      setData(dashboardData);
     } catch (err) {
       console.error("Error loading dashboard:", err);
       setError("Session expired or unauthorized");
