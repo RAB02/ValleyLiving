@@ -1,10 +1,6 @@
-'use client';
-import { usePathname } from "next/navigation";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { UserProvider } from "@/components/UserContext";
+import AppShell from "@/components/AppShell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,27 +12,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export default function RootLayout({ children }) {
-  const pathname = usePathname();
-  const isHomePage = pathname === "/";
+export const metadata = {
+  title: "ValleyLiving",
+  description: "Apartment management platform",
+};
 
+export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <div className="background flex flex-col min-h-screen">
-          <UserProvider>
-          {/* Navbar at the top */}
-          <Navbar />
-
-            {/* Content that expands to push the footer down */}
-            <main className={`flex-grow ${isHomePage ? "" : "pt-20"}`}>
-              {children}
-            </main>
-
-          </UserProvider>
-          {/* Footer always at the bottom */}
-          <Footer />
-        </div>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
