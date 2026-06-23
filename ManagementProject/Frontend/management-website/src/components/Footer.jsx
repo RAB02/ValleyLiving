@@ -50,22 +50,8 @@ export default function Footer() {
         <div className="flex justify-between w-full max-w-5xl items-center">
           {/* Designer Info */}
           <p className="text-xs text-center">
-            Website Designed by Ramon Bernal, Steven Valdez, Dante Peraza, Ian
-            Barrera &copy; {new Date().getFullYear()}
+            Website Designed by Ramon Bernal &copy; {new Date().getFullYear()}
           </p>
-
-          {/* Social Media Icons */}
-          <div className="flex space-x-4">
-            <a href="#" className="hover:text-white">
-              <FaFacebookF size={16} />
-            </a>
-            <a href="#" className="hover:text-white">
-              <FaGoogle size={16} />
-            </a>
-            <a href="#" className="hover:text-white">
-              <FaInstagram size={16} />
-            </a>
-          </div>
         </div>
       </div>
     </footer>

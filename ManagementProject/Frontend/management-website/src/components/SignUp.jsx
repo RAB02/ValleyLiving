@@ -53,8 +53,6 @@ export default function SignUp() {
       return;
     }
 
-    console.log("Signed up:", signUpData);
-
     setData({
       name: "",
       email: "",

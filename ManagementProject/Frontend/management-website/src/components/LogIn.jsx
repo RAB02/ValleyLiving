@@ -44,8 +44,6 @@ export default function LogIn() {
     }
 
     setUser(user);
-    console.log("USER:", user);
-    console.log("PROFILE:", profile);
     
     if (profile.role === "admin") {
       router.push("/admin/dashboard");
