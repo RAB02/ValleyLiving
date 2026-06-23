@@ -1,45 +1,54 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabaseClient";
 
-const ApplyForm = () => {
-  const [formData, setFormData] = useState({
-    apartmentId: "",
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    dob: "",
-    ssn: "",
-    employer: "",
-    jobTitle: "",
-    monthlyIncome: "",
-    employmentLength: "",
-    currentAddress: "",
-    rentAmount: "",
-    landlordName: "",
-    landlordPhone: "",
-    consent: false,
-  });
+const initialFormData = {
+  apartmentId: "",
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  dob: "",
+  ssn: "",
+  employer: "",
+  jobTitle: "",
+  monthlyIncome: "",
+  employmentLength: "",
+  currentAddress: "",
+  rentAmount: "",
+  landlordName: "",
+  landlordPhone: "",
+  consent: false,
+};
 
+export default function ApplyForm() {
+  const [formData, setFormData] = useState(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState({ type: "", text: "" });
+
   const [apartments, setApartments] = useState([]);
   const [loadingApartments, setLoadingApartments] = useState(true);
 
-  // Fetch available apartments on component mount
   useEffect(() => {
     const fetchApartments = async () => {
       try {
-        const response = await fetch("http://localhost:8080/rentals");
-        if (response.ok) {
-          const data = await response.json();
-          setApartments(data || []);
-        } else {
-          console.error("Failed to fetch apartments");
+        setLoadingApartments(true);
+
+        const { data, error } = await supabase
+          .from("Apartments")
+          .select("apartment_id, address, pricing, bed, bath, is_occupied")
+          .eq("is_occupied", 0)
+          .order("apartment_id", { ascending: true });
+
+        if (error) {
+          throw error;
         }
+
+        setApartments(data || []);
       } catch (error) {
         console.error("Error fetching apartments:", error);
+        setApartments([]);
       } finally {
         setLoadingApartments(false);
       }
@@ -50,6 +59,7 @@ const ApplyForm = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
@@ -58,73 +68,77 @@ const ApplyForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setIsSubmitting(true);
     setSubmitMessage({ type: "", text: "" });
 
-    try {
-      const response = await fetch("http://localhost:8080/apply", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          apartmentId: formData.apartmentId || null,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          phone: formData.phone,
-          dob: formData.dob || null,
-          ssn: formData.ssn || null,
-          employer: formData.employer || null,
-          jobTitle: formData.jobTitle || null,
-          monthlyIncome: formData.monthlyIncome ? parseFloat(formData.monthlyIncome) : null,
-          employmentLength: formData.employmentLength || null,
-          currentAddress: formData.currentAddress || null,
-          rentAmount: formData.rentAmount ? parseFloat(formData.rentAmount) : null,
-          landlordName: formData.landlordName || null,
-          landlordPhone: formData.landlordPhone || null,
-          consent: formData.consent,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSubmitMessage({
-          type: "success",
-          text: "Application submitted successfully! We will review your application and get back to you soon.",
-        });
-        // Reset form
-        setFormData({
-          apartmentId: "",
-          firstName: "",
-          lastName: "",
-          email: "",
-          phone: "",
-          dob: "",
-          ssn: "",
-          employer: "",
-          jobTitle: "",
-          monthlyIncome: "",
-          employmentLength: "",
-          currentAddress: "",
-          rentAmount: "",
-          landlordName: "",
-          landlordPhone: "",
-          consent: false,
-        });
-      } else {
-        setSubmitMessage({
-          type: "error",
-          text: data.error || "Failed to submit application. Please try again.",
-        });
-      }
-    } catch (error) {
-      console.error("Error submitting application:", error);
+    if (!formData.consent) {
       setSubmitMessage({
         type: "error",
-        text: "An error occurred while submitting your application. Please try again.",
+        text: "You must consent to a background and credit check before submitting.",
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        throw new Error("Please log in before submitting an application.");
+      }
+
+      const { error } = await supabase.from("RentalApplications").insert({
+        user_id: user.id,
+        apartment_id: formData.apartmentId
+          ? Number(formData.apartmentId)
+          : null,
+
+        first_name: formData.firstName.trim(),
+        last_name: formData.lastName.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+
+        date_of_birth: formData.dob || null,
+        ssn: formData.ssn.trim() || null,
+
+        employer: formData.employer.trim() || null,
+        job_title: formData.jobTitle.trim() || null,
+        monthly_income: formData.monthlyIncome
+          ? Number(formData.monthlyIncome)
+          : null,
+        employment_length: formData.employmentLength.trim() || null,
+
+        current_address: formData.currentAddress.trim() || null,
+        rent_amount: formData.rentAmount ? Number(formData.rentAmount) : null,
+        landlord_name: formData.landlordName.trim() || null,
+        landlord_phone: formData.landlordPhone.trim() || null,
+
+        consent: formData.consent,
+        status: "pending",
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setSubmitMessage({
+        type: "success",
+        text: "Application submitted successfully! We will review your application and get back to you soon.",
+      });
+
+      setFormData(initialFormData);
+    } catch (error) {
+      console.error("Error submitting application:", error);
+
+      setSubmitMessage({
+        type: "error",
+        text:
+          error.message ||
+          "An error occurred while submitting your application. Please try again.",
       });
     } finally {
       setIsSubmitting(false);
@@ -138,13 +152,16 @@ const ApplyForm = () => {
           <h1 className="text-center text-3xl font-extrabold text-gray-900">
             Rental Application Form
           </h1>
+
           <h2 className="text-center text-xl font-extrabold text-gray-900">
             Be Sure To Be Logged In
           </h2>
+
           <p className="mt-2 text-center text-sm text-gray-600">
-            Please fill out the form below to apply for an apartment
+            Please fill out the form below to apply for an apartment.
           </p>
         </div>
+
         {submitMessage.text && (
           <div
             className={`p-4 rounded-md ${
@@ -156,12 +173,14 @@ const ApplyForm = () => {
             {submitMessage.text}
           </div>
         )}
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {/* Apartment Selection Section */}
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-medium text-gray-900">
               Apartment Selection
             </h3>
+
             <div className="mt-4">
               <label
                 htmlFor="apartment-id"
@@ -169,8 +188,11 @@ const ApplyForm = () => {
               >
                 Select Apartment <span className="text-red-500">*</span>
               </label>
+
               {loadingApartments ? (
-                <p className="mt-1 text-sm text-gray-500">Loading apartments...</p>
+                <p className="mt-1 text-sm text-gray-500">
+                  Loading apartments...
+                </p>
               ) : (
                 <select
                   name="apartmentId"
@@ -181,23 +203,33 @@ const ApplyForm = () => {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 >
                   <option value="">-- Please select an apartment --</option>
+
                   {apartments.map((apartment) => (
-                    <option key={apartment.apartment_id} value={apartment.apartment_id}>
-                      {apartment.address} - ${apartment.pricing}/month ({apartment.bed} bed, {apartment.bath} bath)
+                    <option
+                      key={apartment.apartment_id}
+                      value={apartment.apartment_id}
+                    >
+                      {apartment.address} - ${apartment.pricing}/month (
+                      {apartment.bed} bed, {apartment.bath} bath)
                     </option>
                   ))}
                 </select>
               )}
+
               {apartments.length === 0 && !loadingApartments && (
-                <p className="mt-1 text-sm text-red-500">No available apartments found.</p>
+                <p className="mt-1 text-sm text-red-500">
+                  No available apartments found.
+                </p>
               )}
             </div>
           </div>
+
           {/* Personal Information Section */}
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-medium text-gray-900">
               Personal Information
             </h3>
+
             <div className="mt-4 grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-6">
               <div>
                 <label
@@ -206,6 +238,7 @@ const ApplyForm = () => {
                 >
                   First Name
                 </label>
+
                 <input
                   type="text"
                   name="firstName"
@@ -217,6 +250,7 @@ const ApplyForm = () => {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
+
               <div>
                 <label
                   htmlFor="last-name"
@@ -224,6 +258,7 @@ const ApplyForm = () => {
                 >
                   Last Name
                 </label>
+
                 <input
                   type="text"
                   name="lastName"
@@ -235,6 +270,7 @@ const ApplyForm = () => {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
+
               <div className="sm:col-span-2">
                 <label
                   htmlFor="email"
@@ -242,6 +278,7 @@ const ApplyForm = () => {
                 >
                   Email Address
                 </label>
+
                 <input
                   type="email"
                   name="email"
@@ -253,6 +290,7 @@ const ApplyForm = () => {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
+
               <div className="sm:col-span-2">
                 <label
                   htmlFor="phone"
@@ -260,6 +298,7 @@ const ApplyForm = () => {
                 >
                   Phone Number
                 </label>
+
                 <input
                   type="tel"
                   name="phone"
@@ -271,6 +310,7 @@ const ApplyForm = () => {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
+
               <div>
                 <label
                   htmlFor="dob"
@@ -278,6 +318,7 @@ const ApplyForm = () => {
                 >
                   Date of Birth
                 </label>
+
                 <input
                   type="date"
                   name="dob"
@@ -287,6 +328,7 @@ const ApplyForm = () => {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
+
               <div>
                 <label
                   htmlFor="ssn"
@@ -294,6 +336,7 @@ const ApplyForm = () => {
                 >
                   Social Security Number (Optional)
                 </label>
+
                 <input
                   type="text"
                   name="ssn"
@@ -305,11 +348,13 @@ const ApplyForm = () => {
               </div>
             </div>
           </div>
+
           {/* Employment Information Section */}
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-medium text-gray-900">
               Employment Information
             </h3>
+
             <div className="mt-4 grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-6">
               <div className="sm:col-span-2">
                 <label
@@ -318,6 +363,7 @@ const ApplyForm = () => {
                 >
                   Current Employer
                 </label>
+
                 <input
                   type="text"
                   name="employer"
@@ -327,6 +373,7 @@ const ApplyForm = () => {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
+
               <div>
                 <label
                   htmlFor="job-title"
@@ -334,6 +381,7 @@ const ApplyForm = () => {
                 >
                   Job Title
                 </label>
+
                 <input
                   type="text"
                   name="jobTitle"
@@ -343,6 +391,7 @@ const ApplyForm = () => {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
+
               <div>
                 <label
                   htmlFor="monthly-income"
@@ -350,6 +399,7 @@ const ApplyForm = () => {
                 >
                   Monthly Income
                 </label>
+
                 <input
                   type="number"
                   name="monthlyIncome"
@@ -359,6 +409,7 @@ const ApplyForm = () => {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
+
               <div className="sm:col-span-2">
                 <label
                   htmlFor="employment-length"
@@ -366,6 +417,7 @@ const ApplyForm = () => {
                 >
                   Length of Employment
                 </label>
+
                 <input
                   type="text"
                   name="employmentLength"
@@ -378,11 +430,13 @@ const ApplyForm = () => {
               </div>
             </div>
           </div>
+
           {/* Rental History Section */}
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-medium text-gray-900">
               Rental History
             </h3>
+
             <div className="mt-4 grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-6">
               <div className="sm:col-span-2">
                 <label
@@ -391,6 +445,7 @@ const ApplyForm = () => {
                 >
                   Current Address
                 </label>
+
                 <input
                   type="text"
                   name="currentAddress"
@@ -400,6 +455,7 @@ const ApplyForm = () => {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
+
               <div>
                 <label
                   htmlFor="rent-amount"
@@ -407,6 +463,7 @@ const ApplyForm = () => {
                 >
                   Current Rent Amount
                 </label>
+
                 <input
                   type="number"
                   name="rentAmount"
@@ -416,6 +473,7 @@ const ApplyForm = () => {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
+
               <div>
                 <label
                   htmlFor="landlord-name"
@@ -423,6 +481,7 @@ const ApplyForm = () => {
                 >
                   Landlord's Name
                 </label>
+
                 <input
                   type="text"
                   name="landlordName"
@@ -432,6 +491,7 @@ const ApplyForm = () => {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
+
               <div className="sm:col-span-2">
                 <label
                   htmlFor="landlord-phone"
@@ -439,6 +499,7 @@ const ApplyForm = () => {
                 >
                   Landlord's Phone
                 </label>
+
                 <input
                   type="tel"
                   name="landlordPhone"
@@ -450,6 +511,7 @@ const ApplyForm = () => {
               </div>
             </div>
           </div>
+
           {/* Consent and Submit */}
           <div>
             <div className="flex items-center">
@@ -459,8 +521,10 @@ const ApplyForm = () => {
                 type="checkbox"
                 checked={formData.consent}
                 onChange={handleChange}
+                required
                 className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
               />
+
               <label
                 htmlFor="consent"
                 className="ml-2 block text-sm text-gray-900"
@@ -468,6 +532,7 @@ const ApplyForm = () => {
                 I consent to a background and credit check.
               </label>
             </div>
+
             <div className="mt-6">
               <button
                 type="submit"
@@ -482,6 +547,4 @@ const ApplyForm = () => {
       </div>
     </div>
   );
-};
-
-export default ApplyForm;
+}

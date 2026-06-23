@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UserContext } from "@/components/UserContext";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function InputSide() {
   const [name, setName] = useState("");
@@ -10,44 +11,74 @@ export default function InputSide() {
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
   const [buttonLoading, setButtonLoading] = useState(false);
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useContext(UserContext);
+
   const rental = searchParams.get("rental");
 
   useEffect(() => {
+    const loadUser = async () => {
+      const {
+        data: { user: authUser },
+        error,
+      } = await supabase.auth.getUser();
+
+      if (error) {
+        console.error("Error getting user:", error);
+        return;
+      }
+
+      if (authUser) {
+        setName(
+          authUser.user_metadata?.name ||
+            authUser.user_metadata?.full_name ||
+            ""
+        );
+
+        setEmail(authUser.email || "");
+      }
+    };
+
+    loadUser();
+
     if (rental) {
       setMessage(
         `Hi, I'm interested in the ${rental} apartment. Can you provide more details?`
       );
     }
-
-    if (user) {
-      setName(user.name || user.username || "User");
-      setEmail(user.email || "");
-    }
-    console.log("User", user);
-  }, [rental, user]);
+  }, [rental]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setButtonLoading(true);
 
-    const response = await fetch("https://formspree.io/f/movnoylw", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ name, email, phone, message }),
-    });
+    try {
+      const response = await fetch("https://formspree.io/f/movnoylw", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          phone,
+          message,
+        }),
+      });
 
-    if (response.ok) {
-      router.push("/success");
-    } else {
+      if (response.ok) {
+        router.push("/success");
+      } else {
+        alert("Failed to submit form");
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error);
       alert("Failed to submit form");
+    } finally {
+      setButtonLoading(false);
     }
-
-    setButtonLoading(false);
   };
 
   return (
@@ -100,17 +131,13 @@ export default function InputSide() {
       </div>
 
       <div className="absolute bottom-5 right-5">
-        {buttonLoading ? (
-          <button className="px-6 py-3 bg-blue-900 text-white rounded-lg">
-            Loading...
-          </button>
-        ) : (
-          <input
-            type="submit"
-            value="Send Message"
-            className="px-6 py-3 bg-blue-900 text-white rounded-lg cursor-pointer"
-          />
-        )}
+        <button
+          type="submit"
+          disabled={buttonLoading}
+          className="px-6 py-3 bg-blue-900 text-white rounded-lg cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {buttonLoading ? "Loading..." : "Send Message"}
+        </button>
       </div>
     </form>
   );

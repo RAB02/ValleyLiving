@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function RentalApplicationsPage() {
   const [applications, setApplications] = useState([]);
@@ -9,34 +10,36 @@ export default function RentalApplicationsPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const fetchApplications = async () => {
-      try {
-        const res = await fetch("http://localhost:8080/admin/applicants", {
-          method: "GET",
-          credentials: "include", // send cookies / JWT
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
+  const fetchApplications = async () => {
+    try {
+      setLoading(true);
 
-        if (!res.ok) {
-          throw new Error("Failed to load rental applications");
-        }
+      const { data, error } = await supabase
+        .from("RentalApplications")
+        .select(`
+          *,
+          Apartments (
+            apartment_id,
+            apartment_name,
+            address,
+            pricing
+          )
+        `)
+        .order("created_at", { ascending: false });
 
-        const data = await res.json();
-        // backend sends: { applicants: [...] }
-        setApplications(data.applicants || []);
-        console.log("Applicants:", data.applicants);
-      } catch (err) {
-        console.error(err);
-        setError(err.message || "Error loading applications");
-      } finally {
-        setLoading(false);
-      }
-    };
+      if (error) throw error;
 
-    fetchApplications();
-  }, []);
+      setApplications(data || []);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Error loading applications");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchApplications();
+}, []);
 
   const filteredApplications =
     statusFilter === "all"
@@ -46,35 +49,26 @@ export default function RentalApplicationsPage() {
         );
 
   const handleStatusChange = async (id, newStatus) => {
-    try {
-      // Call backend
-      const res = await fetch(
-        `http://localhost:8080/admin/applicants/${id}/status`,
-        {
-          method: "PATCH",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ status: newStatus }),
-        }
-      );
+  try {
+    const { error } = await supabase
+      .from("RentalApplications")
+      .update({ status: newStatus })
+      .eq("application_id", id);
 
-      if (!res.ok) {
-        throw new Error("Failed to update status");
-      }
+    if (error) throw error;
 
-      // Update local state so UI reflects the change
-      setApplications((prev) =>
-        prev.map((app) =>
-          app.application_id === id ? { ...app, status: newStatus } : app
-        )
-      );
-    } catch (err) {
-      console.error(err);
-      alert(err.message || "Error updating status");
-    }
-  };
+    setApplications((prev) =>
+      prev.map((app) =>
+        app.application_id === id
+          ? { ...app, status: newStatus }
+          : app
+      )
+    );
+  } catch (err) {
+    console.error(err);
+    alert(err.message || "Error updating status");
+  }
+};
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -138,9 +132,6 @@ export default function RentalApplicationsPage() {
                       Address / Rent
                     </th>
                     <th className="px-4 py-3 text-left font-semibold text-slate-700">
-                      Current Landlord
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">
                       Status
                     </th>
                     <th className="px-4 py-3 text-left font-semibold text-slate-700">
@@ -162,7 +153,7 @@ export default function RentalApplicationsPage() {
 
                         <div className="text-xs text-slate-500">
                           DOB:{" "}
-                          {new Date(app.date_of_birth).toLocaleDateString()}
+                          {app.date_of_birth ? new Date(app.date_of_birth).toLocaleDateString() : "N/A"}
                         </div>
                       </td>
 
@@ -181,35 +172,25 @@ export default function RentalApplicationsPage() {
                           {app.job_title || "N/A"}
                         </div>
                         <div className="text-xs text-slate-500">
-                          {app.employer}
+                          {app.employer || "N/A"}
                         </div>
                         <div className="text-xs text-slate-500">
-                          Income: ${app.monthly_income}
+                          Income: ${app.monthly_income || "N/A"}
                         </div>
 
                         <div className="text-xs text-slate-500">
-                          {app.employment_length} yrs employed
+                          {app.employment_length || "N/A"} yrs employed
                         </div>
                       </td>
 
                       {/* Rent + Address */}
                       <td className="px-4 py-3">
                         <div className="text-slate-900">
-                          {app.address}
+                          {app.Apartments?.address}
                         </div>
 
                         <div className="text-xs text-slate-500">
-                          Rent: ${app.pricing}
-                        </div>
-                      </td>
-
-                      {/* Landlord */}
-                      <td className="px-4 py-3">
-                        <div className="text-slate-900">
-                          {app.landlord_name}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {app.landlord_phone}
+                          Rent: ${app.Apartments?.pricing}
                         </div>
                       </td>
 
