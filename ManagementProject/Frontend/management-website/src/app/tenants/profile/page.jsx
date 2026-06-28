@@ -1,11 +1,39 @@
 "use client";
-import React, { useContext } from "react";
+import React, { useContext, useState, useEffect } from "react"; 
 import { UserContext } from "@/components/UserContext";
 import RecentlyViewed from "@/components/RecentlyViewed";
 import RentingTab from "@/components/RentingTab";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function TenantProfile() {
   const { user } = useContext(UserContext);
+  const [hasActiveLease, setHasActiveLease] = useState(false);
+
+  useEffect(() => {
+    const checkLeases = async () => {
+      if (!user) {
+        setHasActiveLease(false);
+        return;
+      };
+
+      try {
+        const { data, error } = await supabase
+        .from("Leases")
+        .select("lease_id")
+        .eq("user_id", user.id)
+        .eq("status", "active");
+
+      if (error) throw error;
+
+      setHasActiveLease(data && data.length > 0);
+      } catch (err) {
+        console.error("Failed loading leases:", err);
+        setHasActiveLease(false);
+      }
+      
+    };
+    checkLeases();
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -55,9 +83,14 @@ export default function TenantProfile() {
                 <li>
                   <a href="/contact" className="text-indigo-600 hover:underline">Contact management</a>
                 </li>
+
+                {hasActiveLease && (
                 <li>
-                  <a href="/tenants/maintenance" className="text-indigo-600 hover:underline">Submit maintenance request</a>
-                </li>
+                    <a href="/tenants/maintenance" className="text-indigo-600 hover:underline">
+                      Submit maintenance request
+                    </a>
+                  </li>
+                )}
               </ul>
             </div>
           </div>
